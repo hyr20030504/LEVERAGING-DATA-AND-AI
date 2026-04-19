@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Capital Stack & Return Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css">
+<style>
+/* ═══════════════════════ CSS VARIABLES & RESET ═══════════════════════ */
+:root {
+  --bg-primary: #0c0f17;
+  --bg-secondary: #10131c;
+  --surface-card: #161a27;
+  --surface-elevated: #1e2333;
+  --surface-hover: #262c3f;
+  --border-subtle: #282e42;
+  --border-accent: #353c55;
+  --text-primary: #e8e4df;
+  --text-secondary: #9ea3b0;
+  --text-tertiary: #555b6e;
+  --gold: #c9a96e;
+  --gold-dim: #9e8555;
+  --blue: #5b9bd5;
+  --teal: #5bbfa5;
+  --red: #d47272;
+  --green: #5bd48e;
+  --amber: #d4a95b;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Playfair Display', serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ═══════════════════════ BACKGROUND TEXTURE ═══════════════════════ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, #c9a96e08 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 90%, #5b9bd508 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ═══════════════════════ LAYOUT ═══════════════════════ */
+.app-wrapper {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+.header {
+  padding: 28px 36px 22px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, #10131c 0%, var(--bg-primary) 100%);
+}
+
+.header-inner {
+  max-width: 1380px;
+  margin: 0 auto;
+}
+
+.header-tag {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.header-tag svg { width: 15px; height: 15px; color: var(--gold); }
+
+.header-tag span {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.header h1 {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.header h1 .accent { color: var(--gold); }
+
+.header p {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+  letter-spacing: 0.03em;
+}
+
+/* ── KPI Strip ── */
+.kpi-strip {
+  padding: 18px 36px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.kpi-grid {
+  max-width: 1380px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 11px;
+}
+
+.kpi-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 11px;
+  padding: 15px 14px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.kpi-card:hover {
+  border-color: var(--border-accent);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+
+.kpi-card[data-accent="gold"]::before { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+.kpi-card[data-accent="green"]::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+.kpi-card[data-accent="blue"]::before { background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+.kpi-card[data-accent="teal"]::before { background: linear-gradient(90deg, transparent, var(--teal), transparent); }
+.kpi-card[data-accent="amber"]::before { background: linear-gradient(90deg, transparent, var(--amber), transparent); }
+.kpi-card[data-accent="red"]::before { background: linear-gradient(90deg, transparent, var(--red), transparent); }
+
+.kpi-label {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kpi-label svg { width: 12px; height: 12px; }
+
+.kpi-value {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  margin-bottom: 2px;
+  transition: color 0.3s;
+}
+
+.kpi-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+/* ── Main Grid ── */
+.main-content {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 26px 36px;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 26px;
+}
+
+/* ── Section Headers ── */
+.section-hdr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.section-hdr .icon-box {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-hdr .icon-box svg { width: 13px; height: 13px; }
+
+.section-hdr span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.section-hdr .line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+/* ── Controls Panel ── */
+.controls-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 13px;
+  padding: 22px 20px;
+}
+
+/* ── Slider ── */
+.slider-group { margin-bottom: 22px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.slider-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slider-label svg { width: 13px; height: 13px; opacity: 0.7; }
+
+.slider-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+
+.slider-track-wrapper {
+  position: relative;
+  height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.slider-track-bg {
+  position: absolute;
+  left: 0; right: 0;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-elevated);
+  overflow: hidden;
+}
+
+.slider-track-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.04s ease;
+}
+
+.slider-thumb {
+  position: absolute;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--bg-primary);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  top: 50%;
+  transition: box-shadow 0.2s;
+  z-index: 2;
+}
+
+.slider-input {
+  position: absolute;
+  left: 0; right: 0;
+  width: 100%;
+  height: 32px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 3;
+  -webkit-appearance: none;
+}
+
+.slider-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+
+/* ── Quick Stats ── */
+.quick-stats {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+}
+
+.quick-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+.quick-stat-row .qs-label { color: var(--text-tertiary); }
+.quick-stat-row .qs-value { font-weight: 600; }
+
+/* ── Chart Cards ── */
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+.chart-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chart-card-header svg { width: 13px; height: 13px; color: var(--gold); }
+
+.chart-card-header span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: 220px;
+}
+
+.chart-canvas-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin-top: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 2px;
+}
+
+/* ── Waterfall Table ── */
+.waterfall-table-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.waterfall-table-header {
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.waterfall-table-header svg { width: 13px; height: 13px; color: var(--gold); }
+
+.waterfall-table-header span {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.waterfall-table { width: 100%; border-collapse: collapse; }
+
+.waterfall-table th {
+  padding: 10px 18px;
+  text-align: right;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.waterfall-table th:first-child { text-align: left; }
+
+.waterfall-table td {
+  padding: 11px 18px;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.waterfall-table td:not(:first-child) { text-align: right; font-size: 12.5px; }
+
+.waterfall-table tr:last-child td {
+  border-bottom: none;
+  background: var(--surface-hover);
+  font-weight: 700;
+}
+
+.waterfall-table tr.divider-row td {
+  border-bottom: 2px solid var(--border-accent);
+}
+
+.tier-badge {
+  display: inline-flex;
+  width: 18px; height: 18px;
+  border-radius: 4px;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+/* ── AI Panel ── */
+.ai-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.ai-panel-header {
+  padding: 16px 22px;
+  background: linear-gradient(135deg, var(--surface-elevated) 0%, var(--surface-card) 100%);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-panel-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-icon-box {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #c9a96e1a, #5bbfa51a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-icon-box svg { width: 16px; height: 16px; color: var(--gold); }
+
+.ai-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+.ai-subtitle {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.ai-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+  color: #0c0f17;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px #c9a96e33;
+}
+
+.ai-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px #c9a96e44; }
+.ai-btn:disabled {
+  background: var(--surface-elevated);
+  color: var(--text-tertiary);
+  box-shadow: none;
+  cursor: wait;
+}
+
+.ai-btn svg { width: 14px; height: 14px; }
+
+.ai-body { padding: 20px 22px; min-height: 100px; }
+
+.ai-placeholder {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-tertiary);
+}
+
+.ai-placeholder svg {
+  width: 34px; height: 34px;
+  margin: 0 auto 10px;
+  opacity: 0.25;
+  display: block;
+}
+
+.ai-placeholder .ph-main { font-size: 12.5px; margin-bottom: 4px; }
+.ai-placeholder .ph-sub { font-size: 10.5px; opacity: 0.6; }
+
+/* Spinner */
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border-subtle);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.ai-loading {
+  text-align: center;
+  padding: 34px 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* AI Result Cards */
+.ai-risk-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 15px 16px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.ai-risk-icon {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ai-risk-icon svg { width: 17px; height: 17px; }
+
+.ai-risk-level {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.ai-risk-summary {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.ai-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+
+.ai-detail-card {
+  padding: 14px 15px;
+  border-radius: 10px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.ai-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.ai-detail-label svg { width: 11px; height: 11px; }
+
+.ai-detail-text {
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.ai-rec {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #c9a96e09;
+  border-left: 3px solid var(--gold);
+}
+
+.ai-rec-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+.ai-rec-label svg { width: 11px; height: 11px; }
+
+.ai-rec-text {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.ai-error {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #d4727215;
+  border: 1px solid #d4727233;
+  color: var(--red);
+  font-size: 12px;
+}
+
+/* ── Footer ── */
+.footer {
+  padding: 18px 36px;
+  border-top: 1px solid var(--border-subtle);
+  text-align: center;
+  margin-top: 20px;
+}
+
+.footer span {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .main-content { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .chart-row { grid-template-columns: 1fr; }
+  .ai-detail-grid { grid-template-columns: 1fr; }
+  .header { padding: 20px 18px 16px; }
+  .kpi-strip, .main-content, .footer { padding-left: 18px; padding-right: 18px; }
+  .ai-panel-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+}
+
+/* ── Fade-in animation ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeUp 0.5s ease forwards;
+  opacity: 0;
+}
+
+.fade-in:nth-child(1) { animation-delay: 0.05s; }
+.fade-in:nth-child(2) { animation-delay: 0.10s; }
+.fade-in:nth-child(3) { animation-delay: 0.15s; }
+.fade-in:nth-child(4) { animation-delay: 0.20s; }
+.fade-in:nth-child(5) { animation-delay: 0.25s; }
+.fade-in:nth-child(6) { animation-delay: 0.30s; }
+</style>
+</head>
+<body>
+<div class="app-wrapper">
+
+  <!-- ═══════ HEADER ═══════ -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="header-tag">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+        <span>AI in Real Estate Development</span>
+      </div>
+      <h1>Live Capital Stack <span class="accent">&</span> Return Visualizer</h1>
+      <p>Real-time waterfall modeling with AI-powered deal analysis</p>
+    </div>
+  </header>
+
+  <!-- ═══════ KPI STRIP ═══════ -->
+  <div class="kpi-strip">
+    <div class="kpi-grid" id="kpiGrid"></div>
+  </div>
+
+  <!-- ═══════ MAIN ═══════ -->
+  <div class="main-content">
+
+    <!-- LEFT: Controls -->
+    <div class="left-col">
+      <div class="section-hdr">
+        <div class="icon-box" style="background:#c9a96e15"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+        <span>Deal Parameters</span>
+        <div class="line"></div>
+      </div>
+      <div class="controls-panel" id="controlsPanel"></div>
+
+      <div class="quick-stats" id="quickStats"></div>
+    </div>
+
+    <!-- RIGHT: Charts & Analysis -->
+    <div class="right-col" style="display:flex;flex-direction:column;gap:22px;">
+
+      <!-- Chart Row: Pie + Distribution -->
+      <div class="chart-row">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+            <span>Capital Structure</span>
+          </div>
+          <div class="chart-canvas-wrap"><canvas id="pieChart"></canvas></div>
+          <div class="chart-legend" id="pieLegend"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/></svg>
+            <span>Profit Distribution</span>
+          </div>
+          <div class="chart-canvas-wrap"><canvas id="distChart"></canvas></div>
+          <div class="chart-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--gold)"></div>LP</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>GP</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cash Flow Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span>Annual Cash Flow to Equity</span>
+        </div>
+        <div class="chart-canvas-wrap" style="height:240px"><canvas id="cfChart"></canvas></div>
+      </div>
+
+      <!-- Waterfall Table -->
+      <div class="waterfall-table-card">
+        <div class="waterfall-table-header">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>
+          <span>Waterfall Distribution</span>
+        </div>
+        <table class="waterfall-table">
+          <thead><tr><th>Tier</th><th>LP</th><th>GP</th></tr></thead>
+          <tbody id="waterfallBody"></tbody>
+        </table>
+      </div>
+
+      <!-- AI Panel -->
+      <div class="section-hdr" style="margin-top:4px">
+        <div class="icon-box" style="background:#5bbfa515"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3 4 4.5 4.5 0 0 1-3-4"/><path d="M12 18v4"/><path d="M10 22h4"/></svg></div>
+        <span>AI Investment Analysis</span>
+        <div class="line"></div>
+      </div>
+
+      <div class="ai-panel">
+        <div class="ai-panel-header">
+          <div class="ai-panel-title-group">
+            <div class="ai-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3 4 4.5 4.5 0 0 1-3-4"/><path d="M12 18v4"/><path d="M10 22h4"/></svg>
+            </div>
+            <div>
+              <div class="ai-title">AI Investment Committee Associate</div>
+              <div class="ai-subtitle">Powered by Claude Sonnet</div>
+            </div>
+          </div>
+          <button class="ai-btn" id="aiBtn" onclick="generateAIInsight()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+            Generate AI Insights
+          </button>
+        </div>
+        <div class="ai-body" id="aiBody">
+          <div class="ai-placeholder">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3 4 4.5 4.5 0 0 1-3-4"/><path d="M12 18v4"/><path d="M10 22h4"/></svg>
+            <div class="ph-main">Click "Generate AI Insights" for a deal assessment</div>
+            <div class="ph-sub">Analysis includes leverage risk, return assessment, and recommendations</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>AI in Real Estate Development · Capital Stack Visualizer · Built with Chart.js + Claude AI</span>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   FINANCIAL ENGINE — Deterministic Calculations
+   ═══════════════════════════════════════════════════════════ */
+
+const state = {
+  acquisitionCost: 25000000,
+  ltv: 65,
+  loanRate: 5.5,
+  holdingYears: 5,
+  exitCapRate: 5.5,
+  noiYield: 6.5
+};
+
+function computeIRR(cashFlows, guess = 0.1) {
+  let rate = guess;
+  for (let i = 0; i < 1000; i++) {
+    let npv = 0, dnpv = 0;
+    for (let t = 0; t < cashFlows.length; t++) {
+      npv += cashFlows[t] / Math.pow(1 + rate, t);
+      dnpv -= t * cashFlows[t] / Math.pow(1 + rate, t + 1);
+    }
+    if (Math.abs(dnpv) < 1e-14) break;
+    const nr = rate - npv / dnpv;
+    if (Math.abs(nr - rate) < 1e-8) return nr;
+    rate = nr;
+  }
+  return rate;
+}
+
+function computeAll() {
+  const { acquisitionCost, ltv, loanRate, holdingYears, exitCapRate, noiYield } = state;
+  const prefReturn = 8, lpSplit = 80, gpSplit = 20, catchUpPct = 100, annualGrowth = 2.5;
+
+  const debtAmount = acquisitionCost * (ltv / 100);
+  const equityAmount = acquisitionCost - debtAmount;
+  const annualDS = debtAmount * (loanRate / 100);
+  const baseNoi = acquisitionCost * (noiYield / 100);
+
+  const noiSchedule = [];
+  for (let y = 1; y <= holdingYears; y++) {
+    noiSchedule.push(baseNoi * Math.pow(1 + annualGrowth / 100, y - 1));
+  }
+
+  const cfToEquity = noiSchedule.map(n => n - annualDS);
+
+  const termNoi = baseNoi * Math.pow(1 + annualGrowth / 100, holdingYears);
+  const exitValue = termNoi / (exitCapRate / 100);
+  const exitEquity = exitValue - debtAmount;
+
+  const dscr = noiSchedule[0] / annualDS;
+  const debtYield = (noiSchedule[0] / debtAmount) * 100;
+
+  // Project IRR
+  const pCF = [-acquisitionCost];
+  for (let y = 0; y < holdingYears; y++) {
+    pCF.push(y === holdingYears - 1 ? noiSchedule[y] + exitValue : noiSchedule[y]);
+  }
+  const projectIRR = computeIRR(pCF);
+
+  // Equity IRR
+  const eCF = [-equityAmount];
+  for (let y = 0; y < holdingYears; y++) {
+    eCF.push(y === holdingYears - 1 ? cfToEquity[y] + exitEquity : cfToEquity[y]);
+  }
+  const equityIRR = computeIRR(eCF);
+
+  // Waterfall
+  const totalEquityProceeds = cfToEquity.reduce((a, b) => a + b, 0) + exitEquity;
+  const totalProfit = totalEquityProceeds - equityAmount;
+  const prefTotal = equityAmount * Math.pow(1 + prefReturn / 100, holdingYears) - equityAmount;
+
+  let rem = totalProfit;
+  const lpPref = Math.min(rem, prefTotal); rem -= lpPref;
+  const gpCatchTarget = (lpPref / (lpSplit / 100)) * (gpSplit / 100);
+  const gpCatchUp = Math.min(rem, gpCatchTarget * (catchUpPct / 100)); rem -= gpCatchUp;
+  const lpResidual = rem * (lpSplit / 100);
+  const gpResidual = rem * (gpSplit / 100);
+
+  const totalLP = equityAmount + lpPref + lpResidual;
+  const totalGP = gpCatchUp + gpResidual;
+
+  const lpShare = totalLP / totalEquityProceeds;
+  const lpCF = [-equityAmount];
+  for (let y = 0; y < holdingYears; y++) {
+    const t = y === holdingYears - 1 ? cfToEquity[y] + exitEquity : cfToEquity[y];
+    lpCF.push(t * lpShare);
+  }
+  const lpIRR = computeIRR(lpCF);
+  const lpMultiple = totalLP / equityAmount;
+  const gpPromote = totalGP / (equityAmount * (gpSplit / 100));
+
+  const annualData = noiSchedule.map((noi, i) => ({
+    year: `Year ${i + 1}`,
+    noi: Math.round(noi),
+    debtService: Math.round(annualDS),
+    cashFlow: Math.round(cfToEquity[i])
+  }));
+
+  return {
+    debtAmount, equityAmount, annualDS, baseNoi, noiSchedule, exitValue, exitEquity,
+    dscr, debtYield, projectIRR, equityIRR, lpIRR, lpMultiple, gpPromote,
+    totalLP, totalGP, lpPref, gpCatchUp, lpResidual, gpResidual, totalProfit,
+    annualData, totalEquityProceeds
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORMATTERS
+   ═══════════════════════════════════════════════════════════ */
+
+const fmt = {
+  cur: v => { if (v >= 1e9) return `$${(v/1e9).toFixed(1)}B`; if (v >= 1e6) return `$${(v/1e6).toFixed(1)}M`; if (v >= 1e3) return `$${(v/1e3).toFixed(0)}K`; return `$${v.toFixed(0)}`; },
+  curFull: v => `$${v.toLocaleString('en-US',{maximumFractionDigits:0})}`,
+  pct: v => `${(v*100).toFixed(1)}%`,
+  pctR: v => `${v.toFixed(1)}%`,
+  mult: v => v === Infinity ? '∞x' : `${v.toFixed(2)}x`
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SLIDER DEFINITIONS
+   ═══════════════════════════════════════════════════════════ */
+
+const sliders = [
+  { key:'acquisitionCost', label:'Total Acquisition Cost', min:5e6, max:1e8, step:5e5, unit:'$', color:'var(--gold)',
+    icon:'<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' },
+  { key:'ltv', label:'Loan-to-Value (LTV)', min:0, max:85, step:1, unit:'%', color:'var(--blue)',
+    icon:'<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>' },
+  { key:'loanRate', label:'Loan Interest Rate', min:2, max:12, step:0.1, unit:'%', color:'var(--blue)',
+    icon:'<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>' },
+  { key:'holdingYears', label:'Holding Period', min:1, max:10, step:1, unit:' yrs', color:'var(--teal)',
+    icon:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>' },
+  { key:'exitCapRate', label:'Exit Cap Rate', min:3, max:10, step:0.1, unit:'%', color:'var(--red)',
+    icon:'<circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/>' },
+  { key:'noiYield', label:'NOI Yield (Going-in)', min:3, max:12, step:0.1, unit:'%', color:'var(--gold)',
+    icon:'<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' }
+];
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER SLIDERS
+   ═══════════════════════════════════════════════════════════ */
+
+function renderSliders() {
+  const panel = document.getElementById('controlsPanel');
+  panel.innerHTML = sliders.map(s => {
+    const val = state[s.key];
+    const display = s.unit === '$' ? fmt.curFull(val) : `${val}${s.unit}`;
+    const pct = ((val - s.min) / (s.max - s.min)) * 100;
+    const minD = s.unit === '$' ? fmt.cur(s.min) : `${s.min}${s.unit}`;
+    const maxD = s.unit === '$' ? fmt.cur(s.max) : `${s.max}${s.unit}`;
+    return `
+      <div class="slider-group">
+        <div class="slider-header">
+          <div class="slider-label">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg>
+            ${s.label}
+          </div>
+          <div class="slider-value" id="sv_${s.key}">${display}</div>
+        </div>
+        <div class="slider-track-wrapper">
+          <div class="slider-track-bg">
+            <div class="slider-track-fill" id="sf_${s.key}" style="width:${pct}%;background:linear-gradient(90deg,${s.color}66,${s.color})"></div>
+          </div>
+          <div class="slider-thumb" id="st_${s.key}" style="left:${pct}%;background:${s.color};box-shadow:0 0 10px ${s.color}55"></div>
+          <input type="range" class="slider-input" min="${s.min}" max="${s.max}" step="${s.step}" value="${val}"
+            oninput="handleSlider('${s.key}',this.value,'${s.unit}','${s.color}')">
+        </div>
+        <div class="slider-range"><span>${minD}</span><span>${maxD}</span></div>
+      </div>
+    `;
+  }).join('');
+}
+
+function handleSlider(key, val, unit, color) {
+  val = parseFloat(val);
+  state[key] = val;
+  const s = sliders.find(x => x.key === key);
+  const pct = ((val - s.min) / (s.max - s.min)) * 100;
+  document.getElementById(`sv_${key}`).textContent = unit === '$' ? fmt.curFull(val) : `${val}${unit}`;
+  document.getElementById(`sf_${key}`).style.width = pct + '%';
+  document.getElementById(`st_${key}`).style.left = pct + '%';
+  updateAll();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CHARTS — Chart.js instances
+   ═══════════════════════════════════════════════════════════ */
+
+let pieChartInst, distChartInst, cfChartInst;
+
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 10;
+Chart.defaults.color = '#555b6e';
+
+function initCharts(data) {
+  // Pie chart
+  pieChartInst = new Chart(document.getElementById('pieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Senior Debt', 'Equity'],
+      datasets: [{
+        data: [data.debtAmount, data.equityAmount],
+        backgroundColor: ['#5b9bd5', '#c9a96e'],
+        borderWidth: 0,
+        cutout: '62%',
+        spacing: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350, easing: 'easeOutQuart' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#161a27',
+          borderColor: '#282e42',
+          borderWidth: 1,
+          titleColor: '#9ea3b0',
+          bodyColor: '#e8e4df',
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: { label: ctx => ` ${ctx.label}: ${fmt.cur(ctx.raw)}` }
+        }
+      }
+    }
+  });
+
+  // Distribution bar
+  distChartInst = new Chart(document.getElementById('distChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Pref Return', 'Catch-Up', 'Residual'],
+      datasets: [
+        { label: 'LP', data: [data.lpPref, 0, data.lpResidual], backgroundColor: '#c9a96e', borderRadius: 4 },
+        { label: 'GP', data: [0, data.gpCatchUp, data.gpResidual], backgroundColor: '#5bbfa5', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350, easing: 'easeOutQuart' },
+      scales: {
+        x: { grid: { display: false }, border: { display: false } },
+        y: { grid: { color: '#282e4222' }, border: { display: false }, ticks: { callback: v => fmt.cur(v) } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#161a27', borderColor: '#282e42', borderWidth: 1,
+          titleColor: '#9ea3b0', bodyColor: '#e8e4df', padding: 10, cornerRadius: 8,
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt.cur(ctx.raw)}` }
+        }
+      }
+    }
+  });
+
+  // Cash flow chart
+  cfChartInst = new Chart(document.getElementById('cfChart'), {
+    type: 'bar',
+    data: {
+      labels: data.annualData.map(d => d.year),
+      datasets: [
+        { label: 'NOI', data: data.annualData.map(d => d.noi), backgroundColor: '#5b9bd566', borderRadius: 4 },
+        { label: 'Debt Service', data: data.annualData.map(d => d.debtService), backgroundColor: '#d4727255', borderRadius: 4 },
+        { label: 'Cash to Equity', data: data.annualData.map(d => d.cashFlow), backgroundColor: '#c9a96e', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 350, easing: 'easeOutQuart' },
+      scales: {
+        x: { grid: { display: false }, border: { display: false } },
+        y: { grid: { color: '#282e4222' }, border: { display: false }, ticks: { callback: v => fmt.cur(v) } }
+      },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 8, padding: 16, font: { size: 10 } }
+        },
+        tooltip: {
+          backgroundColor: '#161a27', borderColor: '#282e42', borderWidth: 1,
+          titleColor: '#9ea3b0', bodyColor: '#e8e4df', padding: 10, cornerRadius: 8,
+          callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt.cur(ctx.raw)}` }
+        }
+      }
+    }
+  });
+}
+
+function updateCharts(data) {
+  // Pie
+  pieChartInst.data.datasets[0].data = [data.debtAmount, data.equityAmount];
+  pieChartInst.update('none');
+
+  // Pie legend
+  const dp = data.debtAmount / state.acquisitionCost * 100;
+  const ep = 100 - dp;
+  document.getElementById('pieLegend').innerHTML = `
+    <div class="legend-item"><div class="legend-dot" style="background:#5b9bd5"></div>Debt (${dp.toFixed(0)}%)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c9a96e"></div>Equity (${ep.toFixed(0)}%)</div>
+  `;
+
+  // Distribution
+  distChartInst.data.datasets[0].data = [data.lpPref, 0, data.lpResidual];
+  distChartInst.data.datasets[1].data = [0, data.gpCatchUp, data.gpResidual];
+  distChartInst.update('none');
+
+  // Cash flow
+  cfChartInst.data.labels = data.annualData.map(d => d.year);
+  cfChartInst.data.datasets[0].data = data.annualData.map(d => d.noi);
+  cfChartInst.data.datasets[1].data = data.annualData.map(d => d.debtService);
+  cfChartInst.data.datasets[2].data = data.annualData.map(d => d.cashFlow);
+  cfChartInst.update('none');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   KPI STRIP
+   ═══════════════════════════════════════════════════════════ */
+
+function renderKPIs(data) {
+  const irrGood = data.projectIRR > 0.12;
+  const dscrSafe = data.dscr > 1.25;
+  const kpis = [
+    { label: 'Project IRR', value: fmt.pct(data.projectIRR), accent: irrGood ? 'green' : 'amber',
+      icon:'<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>' },
+    { label: 'LP IRR', value: fmt.pct(data.lpIRR), accent: 'gold',
+      icon:'<circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/><line x1="12" y1="22" x2="12" y2="18"/>' },
+    { label: 'LP Equity Multiple', value: fmt.mult(data.lpMultiple), accent: 'gold',
+      icon:'<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/>' },
+    { label: 'GP Promote', value: fmt.mult(data.gpPromote), accent: 'teal',
+      icon:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' },
+    { label: 'DSCR', value: data.dscr.toFixed(2) + 'x', accent: dscrSafe ? 'green' : 'red', sub: dscrSafe ? 'Adequate' : 'Below threshold',
+      icon:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>' },
+    { label: 'Exit Value', value: fmt.cur(data.exitValue), accent: 'blue',
+      icon:'<path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' }
+  ];
+
+  document.getElementById('kpiGrid').innerHTML = kpis.map((k,i) => `
+    <div class="kpi-card fade-in" data-accent="${k.accent}">
+      <div class="kpi-label">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--${k.accent})" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${k.icon}</svg>
+        ${k.label}
+      </div>
+      <div class="kpi-value" style="color:var(--${k.accent})">${k.value}</div>
+      ${k.sub ? `<div class="kpi-sub">${k.sub}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   QUICK STATS & WATERFALL TABLE
+   ═══════════════════════════════════════════════════════════ */
+
+function renderQuickStats(data) {
+  const rows = [
+    { label: 'Senior Debt', value: fmt.curFull(data.debtAmount), color: 'var(--blue)' },
+    { label: 'Equity Required', value: fmt.curFull(data.equityAmount), color: 'var(--gold)' },
+    { label: 'Annual Debt Service', value: fmt.curFull(data.annualDS), color: 'var(--text-secondary)' },
+    { label: 'Year 1 NOI', value: fmt.curFull(data.baseNoi), color: 'var(--text-secondary)' },
+    { label: 'Debt Yield', value: data.debtYield.toFixed(1) + '%', color: 'var(--text-secondary)' },
+  ];
+  document.getElementById('quickStats').innerHTML = rows.map(r =>
+    `<div class="quick-stat-row"><span class="qs-label">${r.label}</span><span class="qs-value" style="color:${r.color}">${r.value}</span></div>`
+  ).join('');
+}
+
+function renderWaterfall(data) {
+  const tiers = [
+    { label: 'Preferred Return (8% to LP)', lp: data.lpPref, gp: 0, tier: 1, color: '#c9a96e' },
+    { label: 'GP Catch-Up', lp: 0, gp: data.gpCatchUp, tier: 2, color: '#5bbfa5' },
+    { label: 'Residual Split (80/20)', lp: data.lpResidual, gp: data.gpResidual, tier: 3, color: '#5b9bd5' },
+    { label: 'Return of Capital', lp: data.equityAmount, gp: 0, tier: 0, color: '#8895a7', divider: true },
+    { label: 'Total Distributions', lp: data.totalLP, gp: data.totalGP, tier: -1, color: 'var(--text-primary)' }
+  ];
+
+  document.getElementById('waterfallBody').innerHTML = tiers.map(r => {
+    const cls = r.divider ? ' class="divider-row"' : (r.tier === -1 ? '' : '');
+    const badge = r.tier > 0 ? `<span class="tier-badge" style="background:${r.color}22;color:${r.color}">${r.tier}</span>` : '';
+    return `
+      <tr${cls}>
+        <td style="color:${r.color};${r.tier===-1?'font-weight:700':''}">${badge}${r.label}</td>
+        <td style="color:${r.lp > 0 ? '#c9a96e' : 'var(--text-tertiary)'};${r.tier===-1?'font-weight:700':''}">${fmt.cur(r.lp)}</td>
+        <td style="color:${r.gp > 0 ? '#5bbfa5' : 'var(--text-tertiary)'};${r.tier===-1?'font-weight:700':''}">${fmt.cur(r.gp)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   AI INSIGHTS — Claude API Integration
+   ═══════════════════════════════════════════════════════════ */
+
+async function generateAIInsight() {
+  const btn = document.getElementById('aiBtn');
+  const body = document.getElementById('aiBody');
+  const data = computeAll();
+
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner" style="width:14px;height:14px;border-width:2px;margin:0"></div> Analyzing...`;
+
+  body.innerHTML = `<div class="ai-loading"><div class="spinner"></div>Running investment analysis...</div>`;
+
+  const prompt = `You are a senior real estate investment analyst on an Investment Committee. Analyze this deal and provide a concise ~150 word assessment.
+
+DEAL PARAMETERS:
+- Total Acquisition Cost: ${fmt.curFull(state.acquisitionCost)}
+- LTV: ${state.ltv}%
+- Loan Rate: ${state.loanRate}%
+- Hold Period: ${state.holdingYears} years
+- Exit Cap Rate: ${state.exitCapRate}%
+- NOI Yield: ${state.noiYield}%
+
+KEY METRICS:
+- DSCR: ${data.dscr.toFixed(2)}x
+- Debt Yield: ${data.debtYield.toFixed(1)}%
+- Project IRR: ${fmt.pct(data.projectIRR)}
+- LP IRR: ${fmt.pct(data.lpIRR)}
+- Equity Multiple: ${data.lpMultiple.toFixed(2)}x
+- GP Promote Multiple: ${data.gpPromote.toFixed(2)}x
+
+Provide your assessment in this JSON format:
+{"riskLevel":"LOW or MODERATE or HIGH","summary":"one sentence overall assessment","leverage":"assessment of leverage and DSCR","returns":"assessment of return profile and waterfall structure","recommendation":"your recommendation with one specific suggestion"}
+
+Respond ONLY with valid JSON, no markdown.`;
+
+  try {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    const result = await resp.json();
+    const text = (result.content || []).map(c => c.text || '').join('');
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    const insight = JSON.parse(cleaned);
+
+    const riskColors = { LOW:'#5bd48e', MODERATE:'#d4a95b', HIGH:'#d47272' };
+    const riskBg = { LOW:'#5bd48e', MODERATE:'#d4a95b', HIGH:'#d47272' };
+    const rc = riskColors[insight.riskLevel] || '#d4a95b';
+    const riskIcon = insight.riskLevel === 'LOW'
+      ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'
+      : '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>';
+
+    body.innerHTML = `
+      <div class="ai-risk-banner" style="background:${rc}08;border:1px solid ${rc}22;border-radius:10px">
+        <div class="ai-risk-icon" style="background:${rc}15">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${rc}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${riskIcon}</svg>
+        </div>
+        <div>
+          <div class="ai-risk-level" style="color:${rc}">${insight.riskLevel} RISK</div>
+          <div class="ai-risk-summary">${insight.summary}</div>
+        </div>
+      </div>
+      <div class="ai-detail-grid">
+        <div class="ai-detail-card">
+          <div class="ai-detail-label" style="color:var(--blue)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+            Leverage Analysis
+          </div>
+          <div class="ai-detail-text">${insight.leverage}</div>
+        </div>
+        <div class="ai-detail-card">
+          <div class="ai-detail-label" style="color:var(--gold)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            Return Profile
+          </div>
+          <div class="ai-detail-text">${insight.returns}</div>
+        </div>
+      </div>
+      <div class="ai-rec">
+        <div class="ai-rec-label">
+          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          Recommendation
+        </div>
+        <div class="ai-rec-text">${insight.recommendation}</div>
+      </div>
+    `;
+  } catch (err) {
+    console.error('AI Error:', err);
+    body.innerHTML = `<div class="ai-error">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Failed to generate analysis. Please try again.</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+    Generate AI Insights`;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MASTER UPDATE
+   ═══════════════════════════════════════════════════════════ */
+
+function updateAll() {
+  const data = computeAll();
+  renderKPIs(data);
+  renderQuickStats(data);
+  renderWaterfall(data);
+  updateCharts(data);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════ */
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderSliders();
+  const data = computeAll();
+  renderKPIs(data);
+  renderQuickStats(data);
+  renderWaterfall(data);
+  initCharts(data);
+  // Update pie legend on init
+  const dp = data.debtAmount / state.acquisitionCost * 100;
+  const ep = 100 - dp;
+  document.getElementById('pieLegend').innerHTML = `
+    <div class="legend-item"><div class="legend-dot" style="background:#5b9bd5"></div>Debt (${dp.toFixed(0)}%)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c9a96e"></div>Equity (${ep.toFixed(0)}%)</div>
+  `;
+});
+</script>
+</body>
+</html>
