@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RentComp — Rental Comparison Analyzer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: {
+        display: ['Fraunces', 'serif'],
+        body: ['DM Sans', 'sans-serif'],
+      },
+      colors: {
+        brand: {
+          50: '#f0fdf6',
+          100: '#dcfce9',
+          200: '#bbf7d4',
+          300: '#86efad',
+          400: '#4ade7f',
+          500: '#1db954',
+          600: '#16a34a',
+          700: '#15803d',
+          800: '#166534',
+          900: '#14532d',
+          950: '#052e16',
+        },
+        slate: {
+          925: '#0c1322',
+          950: '#080e1a',
+        }
+      }
+    }
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: #080e1a; color: #e2e8f0; }
+  h1, h2, h3, .font-display { font-family: 'Fraunces', serif; }
+
+  .card {
+    background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.6));
+    border: 1px solid rgba(148, 163, 184, 0.08);
+    backdrop-filter: blur(12px);
+  }
+
+  input, select {
+    background: rgba(15, 23, 42, 0.7) !important;
+    border: 1px solid rgba(148, 163, 184, 0.15) !important;
+    color: #e2e8f0 !important;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input:focus, select:focus {
+    border-color: #1db954 !important;
+    box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.15) !important;
+    outline: none !important;
+  }
+  input::placeholder { color: #64748b !important; }
+
+  .comp-card { transition: transform 0.2s, box-shadow 0.2s; }
+  .comp-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+
+  .results-table th { background: rgba(29, 185, 84, 0.08); }
+  .results-table tr:hover td { background: rgba(29, 185, 84, 0.04); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #1db954, #16a34a);
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary:hover {
+    box-shadow: 0 4px 20px rgba(29, 185, 84, 0.35);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-secondary {
+    background: rgba(148, 163, 184, 0.1);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover { background: rgba(148, 163, 184, 0.18); }
+
+  .glow-ring {
+    box-shadow: 0 0 60px rgba(29, 185, 84, 0.06), 0 0 120px rgba(29, 185, 84, 0.03);
+  }
+
+  .fade-in { animation: fadeIn 0.5s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media print {
+    body { background: #fff; color: #111; }
+    .card { background: #fff; border: 1px solid #ddd; }
+    .no-print { display: none !important; }
+    .results-table th { background: #f0fdf6; color: #111; }
+    .results-table td { color: #111; }
+  }
+
+  .dot-bg {
+    background-image: radial-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+</style>
+</head>
+<body class="min-h-screen dot-bg">
+
+<!-- Header -->
+<header class="border-b border-slate-800/60 no-print">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      </div>
+      <h1 class="font-display text-xl font-600 tracking-tight">Rent<span class="text-brand-400">Comp</span></h1>
+    </div>
+    <span class="text-xs text-slate-500 hidden sm:block">Rental Comparison Analyzer</span>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+
+  <!-- Subject Property -->
+  <section class="card rounded-2xl p-6 sm:p-8 glow-ring">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-8 h-8 rounded-full bg-brand-500/15 flex items-center justify-center">
+        <span class="text-brand-400 text-sm font-bold">1</span>
+      </div>
+      <h2 class="font-display text-lg font-600">Subject Property</h2>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div class="col-span-2 sm:col-span-1">
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">Type</label>
+        <select id="subjectType" class="w-full rounded-lg px-3 py-2.5 text-sm">
+          <option value="Studio">Studio</option>
+          <option value="1 Bedroom" selected>1 Bedroom</option>
+          <option value="2 Bedroom">2 Bedroom</option>
+          <option value="3 Bedroom">3 Bedroom</option>
+          <option value="4+ Bedroom">4+ Bedroom</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">Sq Ft</label>
+        <input type="number" id="subjectSqft" placeholder="850" class="w-full rounded-lg px-3 py-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">Beds</label>
+        <input type="number" id="subjectBeds" placeholder="1" min="0" max="10" class="w-full rounded-lg px-3 py-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">Baths</label>
+        <input type="number" id="subjectBaths" placeholder="1" min="0" max="10" step="0.5" class="w-full rounded-lg px-3 py-2.5 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">Year Built</label>
+        <input type="number" id="subjectYear" placeholder="1995" min="1800" max="2030" class="w-full rounded-lg px-3 py-2.5 text-sm">
+      </div>
+      <div class="col-span-2 sm:col-span-3 lg:col-span-1">
+        <label class="block text-xs text-slate-400 mb-1.5 font-medium uppercase tracking-wider">Neighborhood</label>
+        <input type="text" id="subjectNeighborhood" placeholder="e.g. Midtown" class="w-full rounded-lg px-3 py-2.5 text-sm">
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparable Rentals -->
+  <section class="card rounded-2xl p-6 sm:p-8">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-8 h-8 rounded-full bg-brand-500/15 flex items-center justify-center">
+        <span class="text-brand-400 text-sm font-bold">2</span>
+      </div>
+      <h2 class="font-display text-lg font-600">Comparable Rentals</h2>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5" id="compsContainer">
+      <!-- Comp 1 -->
+      <div class="comp-card rounded-xl border border-slate-700/40 p-5 bg-slate-900/40">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-widest text-brand-400">Comp #1</span>
+          <span class="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 text-xs flex items-center justify-center font-bold">A</span>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">Address / Name</label>
+            <input type="text" data-comp="0" data-field="address" placeholder="123 Main St, Apt 4B" class="w-full rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Rent ($/mo)</label>
+              <input type="number" data-comp="0" data-field="rent" placeholder="2,100" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Sq Ft</label>
+              <input type="number" data-comp="0" data-field="sqft" placeholder="800" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Beds</label>
+              <input type="number" data-comp="0" data-field="beds" placeholder="1" min="0" max="10" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Baths</label>
+              <input type="number" data-comp="0" data-field="baths" placeholder="1" min="0" max="10" step="0.5" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comp 2 -->
+      <div class="comp-card rounded-xl border border-slate-700/40 p-5 bg-slate-900/40">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-widest text-brand-400">Comp #2</span>
+          <span class="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 text-xs flex items-center justify-center font-bold">B</span>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">Address / Name</label>
+            <input type="text" data-comp="1" data-field="address" placeholder="456 Oak Ave, Unit 2" class="w-full rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Rent ($/mo)</label>
+              <input type="number" data-comp="1" data-field="rent" placeholder="2,300" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Sq Ft</label>
+              <input type="number" data-comp="1" data-field="sqft" placeholder="900" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Beds</label>
+              <input type="number" data-comp="1" data-field="beds" placeholder="1" min="0" max="10" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Baths</label>
+              <input type="number" data-comp="1" data-field="baths" placeholder="1" min="0" max="10" step="0.5" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Comp 3 -->
+      <div class="comp-card rounded-xl border border-slate-700/40 p-5 bg-slate-900/40">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-xs font-bold uppercase tracking-widest text-brand-400">Comp #3</span>
+          <span class="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 text-xs flex items-center justify-center font-bold">C</span>
+        </div>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">Address / Name</label>
+            <input type="text" data-comp="2" data-field="address" placeholder="789 Elm Blvd, #12" class="w-full rounded-lg px-3 py-2 text-sm">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Rent ($/mo)</label>
+              <input type="number" data-comp="2" data-field="rent" placeholder="1,950" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Sq Ft</label>
+              <input type="number" data-comp="2" data-field="sqft" placeholder="750" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Beds</label>
+              <input type="number" data-comp="2" data-field="beds" placeholder="1" min="0" max="10" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">Baths</label>
+              <input type="number" data-comp="2" data-field="baths" placeholder="1" min="0" max="10" step="0.5" class="w-full rounded-lg px-3 py-2 text-sm">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Actions -->
+  <div class="flex flex-col sm:flex-row gap-3 no-print">
+    <button onclick="analyze()" class="btn-primary text-white font-semibold py-3 px-8 rounded-xl text-sm flex items-center justify-center gap-2">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Analyze Comps
+    </button>
+    <button onclick="resetAll()" class="btn-secondary text-slate-300 font-medium py-3 px-6 rounded-xl text-sm">
+      Reset All
+    </button>
+    <button onclick="loadSample()" class="btn-secondary text-slate-400 font-medium py-3 px-6 rounded-xl text-sm">
+      Load Sample Data
+    </button>
+  </div>
+
+  <!-- Error -->
+  <div id="errorMsg" class="hidden bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-5 py-3 text-sm"></div>
+
+  <!-- Results -->
+  <section id="resultsSection" class="hidden fade-in space-y-6">
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div class="card rounded-2xl p-6 text-center">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Suggested Fair Market Rent</p>
+        <p id="suggestedRent" class="font-display text-3xl sm:text-4xl font-700 text-brand-400"></p>
+        <p class="text-xs text-slate-500 mt-1">per month</p>
+      </div>
+      <div class="card rounded-2xl p-6 text-center">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Avg Comp $/Sq Ft</p>
+        <p id="avgPsf" class="font-display text-3xl sm:text-4xl font-700 text-slate-200"></p>
+        <p class="text-xs text-slate-500 mt-1">per sq ft / month</p>
+      </div>
+      <div class="card rounded-2xl p-6 text-center">
+        <p class="text-xs text-slate-400 uppercase tracking-wider mb-2 font-medium">Rent Range</p>
+        <p id="rentRange" class="font-display text-3xl sm:text-4xl font-700 text-slate-200"></p>
+        <p class="text-xs text-slate-500 mt-1">low — high</p>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <div class="card rounded-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-700/30">
+        <h3 class="font-display text-base font-600">Detailed Comparison</h3>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="results-table w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs uppercase tracking-wider text-slate-400">
+              <th class="px-5 py-3 font-medium">Property</th>
+              <th class="px-5 py-3 font-medium text-right">Rent</th>
+              <th class="px-5 py-3 font-medium text-right">Sq Ft</th>
+              <th class="px-5 py-3 font-medium text-right">$/Sq Ft</th>
+              <th class="px-5 py-3 font-medium text-right">Beds</th>
+              <th class="px-5 py-3 font-medium text-right">Baths</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody" class="divide-y divide-slate-700/20">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Methodology -->
+    <div class="card rounded-2xl p-6">
+      <h3 class="font-display text-base font-600 mb-3">Analysis Methodology</h3>
+      <p id="methodology" class="text-sm text-slate-400 leading-relaxed"></p>
+    </div>
+
+    <!-- Print -->
+    <div class="no-print flex gap-3">
+      <button onclick="window.print()" class="btn-secondary text-slate-300 font-medium py-2.5 px-5 rounded-xl text-sm flex items-center gap-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2z"/></svg>
+        Print Report
+      </button>
+    </div>
+  </section>
+
+</main>
+
+<!-- Footer -->
+<footer class="border-t border-slate-800/40 mt-12 no-print">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+    <p class="text-xs text-slate-600">RentComp Analyzer — For estimation purposes only. Not a formal appraisal.</p>
+    <p class="text-xs text-slate-600">100% client-side. No data leaves your browser.</p>
+  </div>
+</footer>
+
+<script>
+function getVal(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+function getNum(id) {
+  return parseFloat(getVal(id)) || 0;
+}
+function getCompVal(index, field) {
+  const el = document.querySelector(`[data-comp="${index}"][data-field="${field}"]`);
+  return el ? el.value.trim() : '';
+}
+function getCompNum(index, field) {
+  return parseFloat(getCompVal(index, field)) || 0;
+}
+function fmt(n) {
+  return n.toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+function fmtDec(n, d) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(() => el.classList.add('hidden'), 5000);
+}
+
+function analyze() {
+  document.getElementById('errorMsg').classList.add('hidden');
+  document.getElementById('resultsSection').classList.add('hidden');
+
+  const subjectSqft = getNum('subjectSqft');
+  const subjectBeds = getNum('subjectBeds');
+  const subjectBaths = getNum('subjectBaths');
+  const subjectYear = getNum('subjectYear');
+  const subjectType = getVal('subjectType');
+  const subjectNeighborhood = getVal('subjectNeighborhood');
+
+  if (!subjectSqft || subjectSqft <= 0) {
+    return showError('Please enter the subject property square footage.');
+  }
+
+  // Gather comps
+  const comps = [];
+  for (let i = 0; i < 3; i++) {
+    const address = getCompVal(i, 'address');
+    const rent = getCompNum(i, 'rent');
+    const sqft = getCompNum(i, 'sqft');
+    const beds = getCompNum(i, 'beds');
+    const baths = getCompNum(i, 'baths');
+
+    if (rent > 0 && sqft > 0) {
+      comps.push({ address: address || `Comp #${i + 1}`, rent, sqft, beds, baths, psf: rent / sqft });
+    }
+  }
+
+  if (comps.length === 0) {
+    return showError('Please enter at least one comparable rental with rent and square footage.');
+  }
+
+  // Calculate average $/sqft
+  const avgPsf = comps.reduce((s, c) => s + c.psf, 0) / comps.length;
+
+  // Weighted adjustment: comps closer in size to subject get more weight
+  let weightedPsf = 0;
+  let totalWeight = 0;
+
+  comps.forEach(c => {
+    // Size similarity weight (closer sqft = higher weight)
+    const sizeDiff = Math.abs(c.sqft - subjectSqft) / subjectSqft;
+    const sizeWeight = 1 / (1 + sizeDiff * 2);
+
+    // Bed/bath similarity weight
+    let configWeight = 1;
+    if (subjectBeds > 0 && c.beds > 0) {
+      configWeight *= 1 / (1 + Math.abs(c.beds - subjectBeds) * 0.3);
+    }
+    if (subjectBaths > 0 && c.baths > 0) {
+      configWeight *= 1 / (1 + Math.abs(c.baths - subjectBaths) * 0.2);
+    }
+
+    const w = sizeWeight * configWeight;
+    weightedPsf += c.psf * w;
+    totalWeight += w;
+  });
+
+  weightedPsf = totalWeight > 0 ? weightedPsf / totalWeight : avgPsf;
+
+  // Suggested rent
+  const suggestedRent = Math.round(weightedPsf * subjectSqft / 25) * 25; // round to nearest $25
+
+  const rents = comps.map(c => c.rent);
+  const minRent = Math.min(...rents);
+  const maxRent = Math.max(...rents);
+
+  // Populate summary cards
+  document.getElementById('suggestedRent').textContent = `$${fmt(suggestedRent)}`;
+  document.getElementById('avgPsf').textContent = `$${fmtDec(avgPsf, 2)}`;
+  document.getElementById('rentRange').textContent = `$${fmt(minRent)} — $${fmt(maxRent)}`;
+
+  // Build table
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+
+  // Subject row
+  const subRow = document.createElement('tr');
+  subRow.className = 'bg-brand-500/5';
+  subRow.innerHTML = `
+    <td class="px-5 py-3 font-semibold text-brand-400">
+      <div>${subjectType}${subjectNeighborhood ? ' · ' + subjectNeighborhood : ''}</div>
+      <div class="text-xs text-slate-500 font-normal mt-0.5">Subject Property${subjectYear ? ' · Built ' + subjectYear : ''}</div>
+    </td>
+    <td class="px-5 py-3 text-right font-semibold text-brand-400">$${fmt(suggestedRent)}</td>
+    <td class="px-5 py-3 text-right">${fmt(subjectSqft)}</td>
+    <td class="px-5 py-3 text-right font-medium">$${fmtDec(weightedPsf, 2)}</td>
+    <td class="px-5 py-3 text-right">${subjectBeds || '—'}</td>
+    <td class="px-5 py-3 text-right">${subjectBaths || '—'}</td>
+  `;
+  tbody.appendChild(subRow);
+
+  // Comp rows
+  const labels = ['A', 'B', 'C'];
+  comps.forEach((c, i) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-2">
+          <span class="w-5 h-5 rounded-full bg-slate-700/60 text-xs flex items-center justify-center font-bold text-slate-400">${labels[i]}</span>
+          <span>${c.address}</span>
+        </div>
+      </td>
+      <td class="px-5 py-3 text-right">$${fmt(c.rent)}</td>
+      <td class="px-5 py-3 text-right">${fmt(c.sqft)}</td>
+      <td class="px-5 py-3 text-right">$${fmtDec(c.psf, 2)}</td>
+      <td class="px-5 py-3 text-right">${c.beds || '—'}</td>
+      <td class="px-5 py-3 text-right">${c.baths || '—'}</td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  // Methodology text
+  const methodParts = [
+    `Analysis based on ${comps.length} comparable rental${comps.length > 1 ? 's' : ''}.`,
+    `The average price per square foot across comps is $${fmtDec(avgPsf, 2)}/sq ft.`,
+    `A weighted average of $${fmtDec(weightedPsf, 2)}/sq ft was calculated, giving higher weight to comps more similar in size and bedroom/bathroom configuration to the subject.`,
+    `Applied to the subject's ${fmt(subjectSqft)} sq ft, this yields a suggested fair market rent of $${fmt(suggestedRent)}/month (rounded to nearest $25).`,
+    comps.length > 1 ? `Comp rents range from $${fmt(minRent)} to $${fmt(maxRent)}.` : '',
+  ].filter(Boolean);
+  document.getElementById('methodology').textContent = methodParts.join(' ');
+
+  // Show
+  const results = document.getElementById('resultsSection');
+  results.classList.remove('hidden');
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetAll() {
+  document.querySelectorAll('input').forEach(el => el.value = '');
+  document.getElementById('subjectType').value = '1 Bedroom';
+  document.getElementById('resultsSection').classList.add('hidden');
+  document.getElementById('errorMsg').classList.add('hidden');
+}
+
+function loadSample() {
+  document.getElementById('subjectType').value = '2 Bedroom';
+  document.getElementById('subjectSqft').value = 950;
+  document.getElementById('subjectBeds').value = 2;
+  document.getElementById('subjectBaths').value = 1;
+  document.getElementById('subjectYear').value = 2003;
+  document.getElementById('subjectNeighborhood').value = 'Downtown';
+
+  const samples = [
+    { address: '142 Park Ave, Unit 5A', rent: 2400, sqft: 900, beds: 2, baths: 1 },
+    { address: '88 River St, Apt 3C', rent: 2650, sqft: 1020, beds: 2, baths: 1.5 },
+    { address: '310 Maple Dr, #7', rent: 2200, sqft: 870, beds: 2, baths: 1 },
+  ];
+
+  samples.forEach((s, i) => {
+    document.querySelector(`[data-comp="${i}"][data-field="address"]`).value = s.address;
+    document.querySelector(`[data-comp="${i}"][data-field="rent"]`).value = s.rent;
+    document.querySelector(`[data-comp="${i}"][data-field="sqft"]`).value = s.sqft;
+    document.querySelector(`[data-comp="${i}"][data-field="beds"]`).value = s.beds;
+    document.querySelector(`[data-comp="${i}"][data-field="baths"]`).value = s.baths;
+  });
+}
+</script>
+
+</body>
+</html>
